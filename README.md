@@ -112,8 +112,14 @@ Install Miniconda on your system. Follow the instructions here: https://docs.con
     
    ```bash
    conda create -n bliq_stitch python=3.12
+   ```
+   ```bash
    conda activate bliq_stitch
+   ```
+   ```bash
    conda config --add channels conda-forge
+   ```
+   ```bash
    conda install -n bliq_stitch pyimagej openjdk=8
    ```
 
@@ -163,7 +169,7 @@ Once the code is running, you will be prompted to choose between the following o
 ### Step 2: Directory Selection
 
 Next, you will need to select the directory containing the images to be stitched. Please choose the "Orca flash-Ch-1" folder as the directory folder.
-
+Then, you will need to select the directory to create a "Results" folder and saving images.
 
 ### Step 3: Overlap Selection
 
