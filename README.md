@@ -147,7 +147,7 @@ Run the stitcher:
 
 ## Example Usage
 
-The folder **Example data** can be use to test the stitcher.
+The folder **Example data** can be use to test the stitcher. In this example, the overlap is 10%.
 
 ### Step 1: Mode Selection
 
@@ -164,3 +164,8 @@ Once the code is running, you will be prompted to choose between the following o
 ### Step 2: Directory Selection
 
 Next, you will need to select the directory containing the images to be stitched. Please choose the "Orca flash-Ch-1" folder as the directory folder.
+
+
+### Step 3: Overlap Selection
+
+Chose the percentage of overlapping that you have chosen during acquisition. For this example it is 10%.
