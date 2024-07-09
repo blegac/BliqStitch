@@ -164,8 +164,8 @@ def save_best_images(folder_path, best_images, best_filenames):
 
     if not os.path.exists(new_folder_path):
         os.makedirs(new_folder_path)
-    i = 0
 
+    i = 0
     # Sort the keys by y first, then by x
     sorted_keys = sorted(best_images.keys(), key=lambda k: (k[1], k[0]))
 
@@ -306,9 +306,7 @@ new_folder_path = os.path.join(output_dir, 'best_images')
 if not os.path.exists(new_folder_path):
     os.makedirs(new_folder_path)
 
-
-save_best_images(folder_path, best_images, best_filenames)
-
+save_best_images(new_folder_path, best_images, best_filenames)
 
 print(max_x, max_y)
 
