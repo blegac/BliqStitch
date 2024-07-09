@@ -136,8 +136,7 @@ Activate your virtual environment:
 
 Go to the BliqStitcher/bliq_stitch folder:
    ```bash
-   cd BliqStitcher
-   cd bliq_stitch
+   cd BliqStitch
    ```
 
 Run the stitcher:
