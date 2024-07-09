@@ -31,11 +31,11 @@ label = tk.Label(root, text="Selected Item: ")
 label.pack(pady=10)
 
 # Create a Combobox widget
-combo_box = ttk.Combobox(root, values=["Most Sharp Image", "Z Projection"])
+combo_box = ttk.Combobox(root, values=["Z Projection", "Most Sharp Image"])
 combo_box.pack(pady=5)
 
 # Set default value
-combo_box.set("Most Sharp Image")
+combo_box.set("Z Projection")
 
 # Bind event to selection
 combo_box.bind("<<ComboboxSelected>>", on_select)
@@ -45,9 +45,6 @@ ok_button = ttk.Button(root, text="OK", command=save_selection)
 ok_button.pack(pady=10)
 
 root.mainloop()
-
-# After mainloop ends, you can use the result
-print(f"Chosen analysis: {chosen_analysis}")
 
 
 if chosen_analysis == "Most Sharp Image":
@@ -265,11 +262,15 @@ def save_first_images(folder_path, best_images, best_filenames):
     print(f"Best images have been saved in the folder: {prime_folder_path}")
 
 
+### ImageJ initialization ###
 scyjava.config.add_options('-Xmx14g')
 ij = imagej.init('sc.fiji:fiji:2.5.0')
 
 ij.getApp().getInfo(True)
 
+
+### Directory choice ###
+## Input directory ##
 root = tk.Tk()
 root.withdraw()
 
@@ -278,18 +279,33 @@ if not folder_path:
     print("No folder selected. Exiting.")
     exit()
 
+## Output Directory ##
+root = tk.Tk()
+root.withdraw()
+
+output_path = filedialog.askdirectory(title='Select the directory output')
+if not output_path:
+    print("No folder selected. Exiting.")
+    exit()
+    
+output_dir = os.path.join(output_path, 'Results')
+
 overlap = int(input("Enter the overlap of the stitching (%):"))
 
 # Create a new folder named 'best_images' in the parent folder of folder_path
 parent_folder = os.path.dirname(folder_path)
 
-# Call the function and retrieve the results
-best_images, best_filenames, max_x, max_y = process_images(folder_path)
+if chosen_analysis == "Z Projection":
+    best_images, best_filenames, max_x, max_y = process_images(folder_path)
 
-new_folder_path = os.path.join(parent_folder, 'best_images')
+if chosen_analysis == "Most Sharp Image":
+    best_images, best_scores, _, best_filenames, max_x, max_y = process_images(folder_path)
+
+new_folder_path = os.path.join(output_dir, 'best_images')
 
 if not os.path.exists(new_folder_path):
     os.makedirs(new_folder_path)
+
 
 save_best_images(folder_path, best_images, best_filenames)
 
@@ -321,19 +337,17 @@ with tqdm(total=len(os.listdir(new_folder_path)), desc="Loading Images") as pbar
 
 len_grid = max_x * max_y
 
-
 # Now, you can proceed with BaSiC processing
 basic = BaSiC(get_darkfield=True, smoothness_flatfield=1)
 basic.fit(img_stack)
 
 images_transformed = basic.transform(img_stack)
 
-
 # Save each image individually in the "shaded_images" folder
-shaded_images_folder = os.path.join(parent_folder, "shaded_images")
+shaded_images_folder = os.path.join(output_dir, "shaded_images")
 os.makedirs(shaded_images_folder, exist_ok=True)
 
-def apply_clahe_to_stack(image_stack, clip_limit=100, grid_size=(20, 20)):
+def apply_clahe_to_stack(image_stack, clip_limit=20, grid_size=(5, 5)):
     # Create CLAHE object
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=grid_size)
     
@@ -347,7 +361,6 @@ def apply_clahe_to_stack(image_stack, clip_limit=100, grid_size=(20, 20)):
         
         # Apply CLAHE
         enhanced_img_uint16 = clahe.apply(img_uint16)
-        
         
         # Add the enhanced image to the stack
         enhanced_stack.append(enhanced_img_uint16)
@@ -408,24 +421,73 @@ active_img = ij.WindowManager.getCurrentImage()
 # Convert to a numpy array or some other format you prefer
 active_img_np = ij.py.from_java(active_img)
 
-
 # Create the full path for the new TIFF file
-tif_file_path = os.path.join(parent_folder, new_value + '_shaded_stitched_image.tif')
+tif_file_path = os.path.join(output_dir, new_value + '_shaded_stitched_image.tif')
 
 # Save the NumPy array as a TIFF file
 imwrite(tif_file_path, active_img_np)
 
-print(f"The stitched image has been saved as a TIFF file in the folder: {parent_folder}")
+print(f"The stitched image has been saved as a TIFF file in the folder: {output_dir}")
+
+
+
+# Specify the input and output file paths
+input_file = os.path.join(shaded_images_folder, "TileConfiguration.txt")
+output_file = os.path.join(new_folder_path, "TileConfiguration.txt")
+
+# Read the contents of the input file
+with open(input_file, "r") as f:
+    text = f.read()
+
+# Write the modified text back to the output file
+with open(output_file, "w") as f:
+    f.write(text)
+
+print("Replacement complete. Output saved to", output_file)
+
+## Save a stitch image of the best images or the z projection unchanged
+args = {
+        "type": "[Positions from file]",
+        "order": "[Defined by TileConfiguration]",
+        "layout_file": "TileConfiguration.txt",
+        "directory": new_folder_path,
+        "file_names": name,
+        "output_textfile_name": "TileConfiguration.txt",
+        "fusion_method": "[Linear Blending]",
+        "regression_threshold": "0.30",
+        "max/avg_displacement_threshold": "2.50",
+        "absolute_displacement_threshold": "3.50",
+        "computation_parameters": "[Save memory (but be slower)]",
+        "image_output": "[Fuse and display]",
+    }
+
+total_grids = max_x * max_y 
+
+ij.py.run_plugin(plugin, args)
+
+# Capture the currently active image
+active_img = ij.WindowManager.getCurrentImage()
+
+# Convert to a numpy array or some other format you prefer
+active_img_np = ij.py.from_java(active_img)
+
+# Create the full path for the new TIFF file
+tif_file_path = os.path.join(output_dir, new_value + '_stitched_best_image.tif')
+
+# Save the NumPy array as a TIFF file
+imwrite(tif_file_path, active_img_np)
+
+print(f"The stitched first image has been saved as a TIFF file in the folder: {output_dir}")
+
 
 # Create a new folder named 'first_images' in the parent folder of folder_path
-parent_folder = os.path.dirname(folder_path)
-prime_folder_path = os.path.join(parent_folder, 'first_images')
+prime_folder_path = os.path.join(output_dir, 'first_images')
 
 if not os.path.exists(prime_folder_path):
     os.makedirs(prime_folder_path)
 
 # Create a new folder named 'first_images_shaded' in the parent folder of folder_path
-second_folder_path = os.path.join(parent_folder, 'first_images_shaded')
+second_folder_path = os.path.join(output_dir, 'first_images_shaded')
 
 if not os.path.exists(second_folder_path):
     os.makedirs(second_folder_path)
@@ -498,8 +560,6 @@ args = {
         "image_output": "[Fuse and display]",
     }
 
-total_grids = max_x * max_y 
-
 ij.py.run_plugin(plugin, args)
 
 # Capture the currently active image
@@ -508,49 +568,19 @@ active_img = ij.WindowManager.getCurrentImage()
 # Convert to a numpy array or some other format you prefer
 active_img_np = ij.py.from_java(active_img)
 # Create the full path for the new TIFF file
-tif_file_path = os.path.join(parent_folder, new_value + '_stitched_first_image.tif')
+tif_file_path = os.path.join(output_dir, new_value + '_stitched_first_image.tif')
 
 # Save the NumPy array as a TIFF file
 imwrite(tif_file_path, active_img_np)
 
-print(f"The stitched first image has been saved as a TIFF file in the folder: {parent_folder}")
+print(f"The stitched first image has been saved as a TIFF file in the folder: {output_dir}")
 
-## Save a stitch image of the best images or the z projection unchanged
-args = {
-        "type": "[Positions from file]",
-        "order": "[Defined by TileConfiguration]",
-        "layout_file": "TileConfiguration.txt",
-        "directory": new_folder_path,
-        "file_names": name,
-        "output_textfile_name": "TileConfiguration.txt",
-        "fusion_method": "[Linear Blending]",
-        "regression_threshold": "0.30",
-        "max/avg_displacement_threshold": "2.50",
-        "absolute_displacement_threshold": "3.50",
-        "computation_parameters": "[Save memory (but be slower)]",
-        "image_output": "[Fuse and display]",
-    }
 
-total_grids = max_x * max_y 
 
-ij.py.run_plugin(plugin, args)
-
-# Capture the currently active image
-active_img = ij.WindowManager.getCurrentImage()
-
-# Convert to a numpy array or some other format you prefer
-active_img_np = ij.py.from_java(active_img)
-# Create the full path for the new TIFF file
-tif_file_path = os.path.join(parent_folder, new_value + '_stitched_best_image.tif')
-
-# Save the NumPy array as a TIFF file
-imwrite(tif_file_path, active_img_np)
-
-print(f"The stitched first image has been saved as a TIFF file in the folder: {parent_folder}")
-
+#### MIST parameters if needed ####
 print("MIST parameters:")
 print(f"Grid Width: {max_x}")
 print(f"Grid Height: {max_y}")
 filename_mist = name.replace("{i}", "{p}")
 print(f"Filename Pattern: {filename_mist}")
-print(f"Image DIrectory: {new_folder_path}")
+print(f"Image Directory: {new_folder_path}")
